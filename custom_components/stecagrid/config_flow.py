@@ -21,7 +21,7 @@ async def validate_input(hass: core.HomeAssistant, data):
     # Return info that you want to store in the config entry.
     inverter_host = data["inverter_host"]
     inverter_port = data["inverter_port"]
-    return {"title": f"StecaGrid #{inverter_host}:{inverter_port}#"}
+    return {"title": f"StecaGrid {inverter_host}"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -38,7 +38,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 inverter_host = user_input["inverter_host"]
                 inverter_port = user_input["inverter_port"]
-                info = f"StecaGrid {inverter_host}:{inverter_port}"
+                info = f"StecaGrid {inverter_host}"
                 return self.async_create_entry(title=info, data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
