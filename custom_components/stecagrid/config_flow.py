@@ -1,7 +1,10 @@
 """Config flow for StecaGrid integration."""
 import logging
+
 import voluptuous as vol
+
 from homeassistant import config_entries, core, exceptions
+
 from .const import DOMAIN  # pylint:disable=unused-import
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +21,7 @@ async def validate_input(hass: core.HomeAssistant, data):
     # Return info that you want to store in the config entry.
     inverter_host = data["inverter_host"]
     inverter_port = data["inverter_port"]
-    return {"title": f"StecaGrid {inverter_host}:{inverter_port}"}
+    return {"title": f"StecaGrid #{inverter_host}:{inverter_port}#"}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -26,16 +29,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     
-    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
+    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
         errors = {}
         if user_input is not None:
             try:
-                #info = await validate_input(self.hass, user_input)
+                inverter_host = user_input["inverter_host"]
                 inverter_port = user_input["inverter_port"]
-                info = f"StecaGrid {inverter_port}"
+                info = f"StecaGrid {inverter_host}:{inverter_port}"
                 return self.async_create_entry(title=info, data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
