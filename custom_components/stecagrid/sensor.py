@@ -1,8 +1,6 @@
 """Platform for Stecagrid sensor integration."""
 from datetime import datetime, timedelta
 import logging
-import socket
-import struct
 from homeassistant.const import UnitOfPower
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import (
@@ -23,9 +21,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.util import Throttle
 from homeassistant.helpers.entity import Entity
-from pystecagrid.models import TimeSeries
-from .__init__ import HassStecagrid, MIN_TIME_BETWEEN_UPDATES
-from .const import DOMAIN, KILO
+from .__init__ import HassStecaGrid, MIN_TIME_BETWEEN_UPDATES
+from .const import DOMAIN, WATT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,18 +31,34 @@ async def async_setup_entry(hass: HomeAssistant, config: ConfigEntry, async_add_
     stecagrid = hass.data[DOMAIN][config.entry_id]
 
     sensors = []
-    sensors.append(StecagridEnergy("Stecagrid power", 'power', stecagrid))
-
+    sensors.append(StecagridEnergy('Stecagrid power', stecagrid))
+    
     async_add_entities(sensors)
 
 class StecagridEnergy(Entity):
-    """Representation of an energy sensor."""
+    """Representation of a meter reading sensor."""
 
-    def __init__(self, name):
+    def __init__(self, name, client):
         """Initialize the sensor."""
         self._state = None
-        self._data = client
         self._name = name
+        self._data = client
+        self._unique_id = self._data.get_unique_id()
+
+    @property
+    def device_info(self):
+        """Return device information about this entity."""
+        _LOGGER.debug("Stecagrid: device_info")
+
+        return {
+            "identifiers": {
+                # Unique identifiers within a specific domain
+                (DOMAIN, self.unique_id)
+            },
+            "manufacturer": "Oernsholt (Steca)",
+            "model": "StecaGrid inverter i fyrrum",
+            "name": self._data.get_name()
+        }
 
     @property
     def name(self):
@@ -63,21 +76,27 @@ class StecagridEnergy(Entity):
         return self._state
 
     @property
-    def extra_state_attributes(self):
-        """Return state attributes."""
-        attributes = dict()
-        attributes['Metering date'] = self._data_date
-        attributes['metering_date'] = self._data_date
-
-        return attributes
-
-    @property
     def unit_of_measurement(self):
         """Return the unit of measurement."""
-        return UnitOfPower.WATT 
+        return UnitOfPower.WATT
+
+    @property
+    def state_class(self):
+        return SensorStateClass.MEASUREMENT
+
+    @property
+    def device_class(self):
+        """Return the device class of the sensor."""
+        return SensorDeviceClass.ENERGY
 
     def update(self):
         """Fetch new state data for the sensor.
         This is the only method that should fetch new data for Home Assistant.
         """
-        self._data.update_energy()
+    
+        _LOGGER.info(f"Steca updating power...")
+
+        power_output = self._data.update_power()       
+
+        self._state = power_output
+        
