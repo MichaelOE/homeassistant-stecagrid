@@ -5,8 +5,8 @@
       "user": {
         "title": "Connect to the device",
         "data": {
-          "host": "IP or hostname",
-          "port": "TCP port",
+          "inverter_host": "IP or hostname",
+          "inverter_port": "TCP port",
         }
       }
     },
