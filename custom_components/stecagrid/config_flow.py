@@ -43,10 +43,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 #inverter_port = user_input["inverter_port"]
                 info = f"StecaGrid {host}"
                 return self.async_create_entry(title=info, data=user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
