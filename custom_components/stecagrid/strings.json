@@ -5,7 +5,8 @@
       "user": {
         "title": "Connect to the device",
         "data": {
-          "host": "Host"
+          "host": "Host",
+          "port": "Port"
         }
       }
     },
