@@ -5,8 +5,8 @@
       "user": {
         "title": "Connect to the device",
         "data": {
-          "host": "Host",
-          "port": "Port"
+          "host": "IP or hostname",
+          "port": "TCP port",
         }
       }
     },
