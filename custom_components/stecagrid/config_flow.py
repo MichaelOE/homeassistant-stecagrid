@@ -6,7 +6,7 @@ import voluptuous as vol
 from homeassistant import config_entries, core, exceptions
 
 #from .const import DOMAIN  # pylint:disable=unused-import
-from .const import (CONF_NAME, CONF_HOST, CONF_PORT, DOMAIN)
+from .const import (CONF_HOST, CONF_PORT, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,9 +37,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             try:
-                inverter_host = user_input["inverter_host"]
-                inverter_port = user_input["inverter_port"]
-                info = f"StecaGrid {inverter_host}"
+                inverter_host = user_input[CONF_HOST]
+                inverter_port = user_input[CONF_PORT]
+                #inverter_host = user_input["inverter_host"]
+                #inverter_port = user_input["inverter_port"]
+                info = f"StecaGrid {host}"
                 return self.async_create_entry(title=info, data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
