@@ -1,20 +1,13 @@
 {
   "config": {
-    "title": "Stecagrid",
     "step": {
       "user": {
-        "title": "Connect to the device",
         "data": {
-          "inverter_host": "IP or hostname",
-          "inverter_port": "TCP port",
+          "inverter_host": "[%key:common::config_flow::data::inverter_host%]",
+          "inverter_port": "[%key:common::config_flow::data::inverter_port%]",
+          "interval": "[%key:common::config_flow::data::scan_interval%]"
         }
       }
-    },
-    "error": {
-      "unknown": "Unexpected error"
-    },
-    "abort": {
-      "already_configured": "Device is already configured"
     }
   }
 }
