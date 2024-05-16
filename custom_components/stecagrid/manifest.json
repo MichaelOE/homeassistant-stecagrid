@@ -1,7 +1,7 @@
 {
   "domain": "stecagrid",
   "name": "Stecagrid",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "config_flow": true,
   "documentation": "https://github.com/MichaelOE/homeassistant-stecagrid"
 }
