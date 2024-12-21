@@ -189,14 +189,17 @@ class StecaConnector:
             _LOGGER.debug(f"Received {len(msgResponse)} bytes '{str(msgResponse)}'")
 
         except Exception as e:
-            #_LOGGER.warning("No response from Steca inverter. " +  str(e))
+            # _LOGGER.warning("No response from Steca inverter. " +  str(e))
             if self._errorcount > 5:
-                _LOGGER.warning(f"No response from Steca inverter. ({self._errorcount}) " +  str(e))
+                _LOGGER.warning(
+                    f"No response from Steca inverter. ({self._errorcount}) " + str(e)
+                )
                 self._previous_value = None
-                
+
             self._errorcount += 1
             return self._previous_value
 
+        self._errorcount = 0
 
         try:
             if len(msgResponse) < 11:
@@ -229,7 +232,6 @@ class StecaConnector:
                     _LOGGER.info("Ingen solproduktion")
                     power_output = PowerOutput_MIN
 
-                self._errorcount = 0
                 self._previous_value = power_output
                 return power_output
 

@@ -1,20 +1,17 @@
 """The StecaGrid integration."""
+
 import asyncio
+from datetime import timedelta
 import logging
-import requests
 
-#import socket
-#import struct
-
-from datetime import timedelta, datetime
 import voluptuous as vol
-from homeassistant.util import Throttle
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-
-from .steca import StecaConnector
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN
+from .steca import StecaConnector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,25 +19,37 @@ CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
 
 PLATFORMS = ["sensor"]
 
+
 async def async_setup(hass: HomeAssistant, config: dict):
     """Set up the StecaGrid component."""
 
     hass.data[DOMAIN] = {}
     return True
 
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up StecaGrid from a config entry."""
-    inverter_host = entry.data['inverter_host']
-    inverter_port = entry.data['inverter_port']
-    
-    hass.data[DOMAIN][entry.entry_id] = HassStecaGrid(inverter_host, inverter_port)
+    inverter_host = entry.data["inverter_host"]
+    inverter_port = entry.data["inverter_port"]
+    inverter_scaninterval = entry.data["scan_interval"]
+    inverter_alias = entry.data["alias"]
 
-    for component in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, component)
-        )
+    stecaApi = StecaConnector(inverter_host, inverter_port)
+
+    # Fetch initial data so we have data when entities subscribe
+    coordinator = StecaGridCoordinator(
+        hass, stecaApi, inverter_alias, inverter_scaninterval
+    )
+    await coordinator.async_config_entry_first_refresh()
+
+    hass.data[DOMAIN][entry.entry_id] = HassStecaGrid(
+        coordinator, inverter_host, inverter_port
+    )
+
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
@@ -57,14 +66,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     return unload_ok
 
+
 class HassStecaGrid:
-    def __init__(self, inverter_host, inverter_port):
+    def __init__(
+        self, coordinator: DataUpdateCoordinator, inverter_host: str, inverter_port: int
+    ):
         self._inverter_host = inverter_host
         self._inverter_port = inverter_port
         _LOGGER.debug("Stecagrid __init__" + self._inverter_host)
-        
+
         # create an instance of StecaConnector
-        self.steca_connector = steca.StecaConnector(self._inverter_host, self._inverter_port)
+        self._coordinator = coordinator
 
     def get_name(self):
         return f"steca_grid_{self._inverter_host}_{str(self._inverter_port)}"
@@ -72,16 +84,38 @@ class HassStecaGrid:
     def get_unique_id(self):
         return f"steca_grid_power_{self._inverter_host}_{str(self._inverter_port)}"
 
-    def update_power(self):
-        # create an instance of StecaConnector
-        #steca_connector = steca.StecaConnector(self._inverter_host, self._inverter_port)
 
-        _LOGGER.debug("Requesting timestamp from Stecagrid")
-        inverterTime = self.steca_connector.GetInverterTime()
-        _LOGGER.debug(f"Inverter time: {inverterTime}")
+class StecaGridCoordinator(DataUpdateCoordinator):
+    """StecaGrid coordinator."""
 
-        _LOGGER.debug("Requesting current power_output from Stecagrid")
-        power_output = self.steca_connector.GetPowerOutput()
-        _LOGGER.debug(f"Done fetching info from Stecagrid, {power_output}W")
+    def __init__(self, hass, stecaAPI: StecaConnector, alias: str, pollinterval: int):
+        """Initialize my coordinator."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            # Name of the data. For logging purposes.
+            name=f"StecaGrid coordinator for '{alias}'",
+            # Polling interval. Will only be polled if there are subscribers.
+            update_interval=timedelta(seconds=pollinterval),
+        )
+        self.stecaApi = stecaAPI
+        self._alias = alias
 
-        return power_output
+    async def _async_update_data(self):
+        # Fetch data from API endpoint. This is the place to pre-process the data to lookup tables so entities can quickly look up their data.
+
+        try:
+            retData = {}
+            async with asyncio.timeout(3):
+                retData["power"] = self.stecaApi.GetPowerOutput()
+                retData["time"] = self.stecaApi.GetInverterTime()
+
+                return retData
+        except:
+            _LOGGER.error("StecaGridCoordinator _async_update_data failed")
+        # except ApiAuthError as err:
+        #     # Raising ConfigEntryAuthFailed will cancel future updates
+        #     # and start a config flow with SOURCE_REAUTH (async_step_reauth)
+        #     raise ConfigEntryAuthFailed from err
+        # except ApiError as err:
+        #     raise UpdateFailed(f"Error communicating with API: {err}")

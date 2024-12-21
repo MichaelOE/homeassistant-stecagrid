@@ -1,243 +1,173 @@
-import socket
-import struct
+"""Platform for Stecagrid sensor integration."""
 
-from logging import getLogger
+from dataclasses import dataclass
+from datetime import timedelta
+import logging
 
-_LOGGER = getLogger(__name__)
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfPower
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-### Constants
-PowerOutput_MIN = 0.0
-PowerOutput_MAX = 10000.0
+from . import StecaGridCoordinator
+from .const import DEFAULT_INVERTER_POLLRATE, DOMAIN
 
-### Variables
-ReceiverAddress = b"\x01"
-SenderAddress = b"\xc9"
-ServiceCode = b"\x40"
-AuthLevel = b"\x01"
-DataLength = bytearray(b"\x00\x01")
-# Identifier = b'\x29'
+_LOGGER = logging.getLogger(__name__)
 
-CRC_8_OFFSET = 0x55
-CRC_16_OFFSET = 0x5555
-
-# A list of 16 CRC-8 values
-CRC8_Table = [
-    0x00,
-    0x8F,
-    0x27,
-    0xA8,
-    0x4E,
-    0xC1,
-    0x69,
-    0xE6,
-    0x9C,
-    0x13,
-    0xBB,
-    0x34,
-    0xD2,
-    0x5D,
-    0xF5,
-    0x7A,
-]
-# A list of 16 CRC-16 values
-CRC16_Table = [
-    0x0000,
-    0xACAC,
-    0xEC05,
-    0x40A9,
-    0x6D57,
-    0xC1FB,
-    0x8152,
-    0x2DFE,
-    0xDAAE,
-    0x7602,
-    0x36AB,
-    0x9A07,
-    0xB7F9,
-    0x1B55,
-    0x5BFC,
-    0xF750,
-]
+SCAN_INTERVAL = timedelta(seconds=DEFAULT_INVERTER_POLLRATE)
 
 
-class StecaConnector:
-    def __init__(self, host, port):
-        self._host = host
-        self._port = port
+@dataclass
+class StecaGridEntityDescription(SensorEntityDescription):
+    """Describes Stecagrid sensor entity."""
 
-    # A function that takes a current CRC value, a data buffer, and a data length as parameters
-    def RS485_CRC8_Block(self, currentCrc, data):
-        # Loop through the data buffer
-        for value in data:
-            # XOR in the data
-            currentCrc ^= value
-            # Perform the XORing for each nibble
-            currentCrc = (currentCrc >> 4) ^ CRC8_Table[currentCrc & 0x0F]
-            currentCrc = (currentCrc >> 4) ^ CRC8_Table[currentCrc & 0x0F]
+    def __init__(
+        self,
+        key,
+        name,
+        icon,
+        device_class,
+        native_unit_of_measurement,
+        value,
+        format=None,
+    ):
+        super().__init__(key)
+        self.key = key
+        self.name = name
+        self.icon = icon
+        if device_class is not None:
+            self.device_class = device_class
+        self.native_unit_of_measurement = native_unit_of_measurement
+        self.value = value
+        self.format = format
 
-        # Return the final CRC value
-        return currentCrc
 
-    # A function that takes a current CRC value, a data buffer, and a data length as parameters
-    def RS485_CRC16_Block(self, currentCrc, data):
-        # Loop through the data buffer
-        for value in data:
-            # XOR in the data
-            currentCrc ^= value
-            # Perform the XORing for each nibble
-            currentCrc = (currentCrc >> 4) ^ CRC16_Table[currentCrc & 0x000F]
-            currentCrc = (currentCrc >> 4) ^ CRC16_Table[currentCrc & 0x000F]
+async def async_setup_entry(
+    hass: HomeAssistant, config: ConfigEntry, async_add_entities
+):
+    """Set up the sensor platform."""
+    stecagrid = hass.data[DOMAIN][config.entry_id]
 
-        # Return the final CRC value
-        return currentCrc
+    entities: list[StecagridSensor] = [
+        StecagridSensor(stecagrid._coordinator, sensor, stecagrid)
+        for sensor in SENSORS_INVERTER
+    ]
 
-    def frameCRC(self, CRCOffset, data):
-        total = CRCOffset
-        total = total + sum(data[0 : len(data)])
-        # Return the final CRC value
-        return total
+    async_add_entities(entities)
 
-    def formulaToFloat(self, threeBytesToConvert):
-        try:
-            temp = (
-                (threeBytesToConvert[2] << 8 | threeBytesToConvert[0]) << 8
-                | threeBytesToConvert[1]
-            ) << 7
-            power_output = struct.unpack(
-                "!f", bytes.fromhex(str(hex(temp)).split("0x")[1])
-            )[0]
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.error(
-                "Fejl ved parsing af inverterdata! - der er sikkert overskyet (output = ",
-                power_output,
-                ")",
-            )
-        return power_output
 
-    def formulaToSInt(self, bytesToConvert):
-        try:
-            sint = int.from_bytes(bytesToConvert, byteorder="big", signed=True)
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.error(
-                "Fejl ved parsing af data fra inverter i formulaToSInt! (output = ",
-                sint,
-                ")",
-            )
-        return sint
+async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+    # Code for setting up your platform inside of the event loop
+    _LOGGER.debug("async_setup_platform")
 
-    def GetInverterTime(self):
-        req = self.GenerateRequestTelegram(b"\x04")
-        retVal = self.PollInverter(req)
-        return retVal
 
-    def GetPowerOutput(self):
-        req = self.GenerateRequestTelegram(b"\x29")
-        retVal = self.PollInverter(req)
-        return retVal
+class StecagridSensor(CoordinatorEntity, SensorEntity):
+    """Representation of a meter reading sensor."""
 
-    def GenerateRequestTelegram(self, RequestIdentifier):
-        ### Generate Dataframe
-        DataFrame = bytearray(b"")
-        DataFrame.extend(RequestIdentifier)  # Add Identifier to frame
-        DataFrameCRC = self.frameCRC(CRC_8_OFFSET, DataFrame)  # calculate dataframe CRC
-        DataFrameLength = bytearray(struct.pack(">h", len(DataFrame)))
-        DataFrame.append(DataFrameCRC)  # and append
+    def __init__(
+        self,
+        coordinator: StecaGridCoordinator,
+        sensor: StecaGridEntityDescription,
+        client,
+    ):
+        """Initialize the sensor."""
+        self._data = client
+        self.coordinator = coordinator
+        self.entity_description: StecaGridEntityDescription = sensor
+        self._attr_unique_id = f"{self.coordinator._alias}_{sensor.key}"
+        self._attr_name = f"{self.coordinator._alias} {sensor.name}"
 
-        ### Concat to FrameData
-        FrameData = bytearray(b"")
-        FrameData.extend(ServiceCode)
-        FrameData.extend(AuthLevel)
-        FrameData.extend(DataFrameLength)
-        FrameData.extend(DataFrame)
+        _LOGGER.info(self._attr_unique_id)
+        self._attr_native_value = None  # Initialize the native value
 
-        ### Generate Header
-        HeaderBegin = bytearray(b"\x02\x01")
-        HeaderLength = bytearray(b"\x00\x10")
-        Header = bytearray(b"")
-        Header.extend(HeaderBegin)
-        Header.extend(HeaderLength)
-        Header.extend(ReceiverAddress)
-        Header.extend(SenderAddress)
-        Header.append(self.RS485_CRC8_Block(CRC_8_OFFSET, Header))
+    @property
+    def device_info(self):
+        """Return device information about this entity."""
+        _LOGGER.debug("StecaGrid: device_info")
 
-        Telegram = bytearray(b"")
-        Telegram.extend(Header)
-        Telegram.extend(FrameData)
+        return {
+            "identifiers": {(DOMAIN, self.coordinator._alias)},
+            "manufacturer": "Steca",
+            "model": "StecaGrid 8000+ 3ph",
+            "name": self.coordinator._alias,
+        }
 
-        # res = RS485_CRC16_Block(CRC_16_OFFSET, Telegram + b'\x03')
-        Telegram.extend(
-            struct.pack(">H", self.RS485_CRC16_Block(CRC_16_OFFSET, Telegram + b"\x03"))
-        )
-        Telegram.extend(b"\x03")
+    @property
+    def should_poll(self):
+        return False
 
-        return Telegram
+    @property
+    def friendly_name(self):
+        return self.entity_description.name
 
-    def PollInverter(self, requestMessage):
-        power_output = PowerOutput_MIN
+    @property
+    def state(self):
+        """Return the state of the sensor."""
+        return self._attr_native_value
+
+    async def async_added_to_hass(self):
+        """Handle entity addition to hass."""
+        # Add the coordinator listener for data updates
+        self.coordinator.async_add_listener(self._handle_coordinator_update)
+        # Ensure that data is fetched initially
+        await self.coordinator.async_refresh()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        data_available = False
 
         try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.settimeout(3)
-            client.connect((self._host, self._port))
-            client.send(requestMessage)
+            # Handle power
+            if "output" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.stecaApi.GetPowerOutput()
+                data_available = True
 
-            msgResponse = client.recv(1024)
-            # Get the length of the received data
-            length = len(msgResponse)
-            _LOGGER.debug(f"Received {len(msgResponse)} bytes '{str(msgResponse)}'")
+            # Handle time
+            if "time" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.stecaApi.GetInverterTime()
+                data_available = True
 
-        except Exception as e:
-            _LOGGER.warning("No response from Steca inverter. " +  str(e))
-            return None #PowerOutput_MIN
+            self._attr_available = data_available
 
-        try:
-            if len(msgResponse) < 11:
-                _LOGGER.info(
-                    "Steca response too short, probably incomplete message received from inverter"
-                )
-                return PowerOutput_MIN
+            # Only call async_write_ha_state if the state has changed
+            if data_available:
+                self.async_write_ha_state()
 
-            ResponseCode = msgResponse[8]
-            ResponseValue = msgResponse[11]
-
-            if ResponseCode == 0x01:  # ServiceNotSupported
-                _LOGGER.warning("Service Not Supported by inverter")
-                return "Service Not Supported by inverter"
-            elif ResponseValue == 0x29:  # Nominal AC power of inverter
-                _LOGGER.debug("Nominal AC power of inverter")
-                if msgResponse[22] == 0x0B:
-                    power_output = self.formulaToFloat(msgResponse[23:26])
-
-                    if (
-                        power_output <= PowerOutput_MIN
-                        or power_output > PowerOutput_MAX
-                    ):  # Range check
-                        _LOGGER.warning(
-                            f"Unusual inverter power '{power_output}', probably wrong message received from inverter"  # noqa: G004
-                        )
-                        power_output = PowerOutput_MIN
-
-                else:
-                    _LOGGER.info("Ingen solproduktion")
-                    power_output = PowerOutput_MIN
-
-                return power_output
-
-            elif ResponseValue == 0x04:  # Data and time
-                _LOGGER.debug("Data and time")
-                year = self.formulaToSInt(msgResponse[13:15])
-                month = self.formulaToSInt(msgResponse[17:19])
-                day = self.formulaToSInt(msgResponse[21:23])
-                hour = self.formulaToSInt(msgResponse[25:27])
-                minute = self.formulaToSInt(msgResponse[29:31])
-                second = self.formulaToSInt(msgResponse[33:35])
-                _LOGGER.debug(
-                    f"Date in inverter {year}-{month}-{day} {hour}:{minute}:{second}"
-                )
-                return f"{year}-{month}-{day} {hour}:{minute}:{second}, status: '{msgResponse[39:len(msgResponse)-4].decode('utf-8')}'"
-
-        except Exception:  # pylint: disable=broad-except
+        except KeyError as ex:
             _LOGGER.debug(
-                f"Fejl ved parsing af inverterdata! - det er måske overskyet eller aften/nat (output = {power_output})"
+                f"KeyError: {str(ex)} while handling {self.entity_description.key}"
             )
-            return PowerOutput_MIN
+        except ValueError as ex:
+            _LOGGER.debug(
+                f"ValueError: {str(ex)} while handling {self.entity_description.key}"
+            )
+        except Exception as ex:
+            _LOGGER.debug(
+                f"Unexpected error: {str(ex)} while handling {self.entity_description.key}"
+            )
+
+
+SENSORS_INVERTER: tuple[SensorEntityDescription, ...] = (
+    StecaGridEntityDescription(
+        key="output",
+        name="Output power",
+        icon="mdi:power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="time",
+        name="timestamp",
+        icon="mdi:clock-digital",
+        device_class=None,
+        native_unit_of_measurement=None,
+        value=lambda data, key: data[key],
+    ),
+)

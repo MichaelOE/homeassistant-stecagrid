@@ -1,0 +1,26 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Inverter er allerede konfigureret"
+        },
+        "error": {
+            "cannot_connect": "Kan ikke forbinde til inverter",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Uventet fejl"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "inverter_host": "Hostname/IP",
+                    "inverter_port": "port",
+                    "scan_interval": "opdatereingsinterval"
+                }
+            },
+            "alias": {
+                "data": {
+                    "alias": "Alias (entity-prefix) for din inverter"
+                }
+            }
+        }
+    }
+}
