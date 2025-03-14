@@ -125,12 +125,12 @@ class StecagridSensor(CoordinatorEntity, SensorEntity):
         try:
             # Handle power
             if "output" in self.entity_description.key:
-                self._attr_native_value = self.coordinator.stecaApi.GetPowerOutput()
+                self._attr_native_value = self.coordinator.data["power"]
                 data_available = True
 
             # Handle time
             if "time" in self.entity_description.key:
-                self._attr_native_value = self.coordinator.stecaApi.GetInverterTime()
+                self._attr_native_value = self.coordinator.data["time"]
                 data_available = True
 
             self._attr_available = data_available

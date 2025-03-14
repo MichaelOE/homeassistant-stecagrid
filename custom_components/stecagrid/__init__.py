@@ -107,8 +107,8 @@ class StecaGridCoordinator(DataUpdateCoordinator):
         try:
             retData = {}
             async with asyncio.timeout(3):
-                retData["power"] = self.stecaApi.GetPowerOutput()
-                retData["time"] = self.stecaApi.GetInverterTime()
+                retData["power"] = await self.stecaApi.GetPowerOutput()
+                retData["time"] = await self.stecaApi.GetInverterTime()
 
                 return retData
         except:

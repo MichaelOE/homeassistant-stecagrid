@@ -1,3 +1,4 @@
+import asyncio
 import socket
 import struct
 
@@ -127,15 +128,14 @@ class StecaConnector:
             )
         return sint
 
-    def GetInverterTime(self):
+    async def GetInverterTime(self):
         req = self.GenerateRequestTelegram(b"\x04")
-        retVal = self.PollInverter(req)
+        retVal = await self.PollInverter(req)
         return retVal
 
-    def GetPowerOutput(self):
+    async def GetPowerOutput(self):
         req = self.GenerateRequestTelegram(b"\x29")
-        retVal = self.PollInverter(req)
-        return retVal
+        return await self.PollInverter(req)
 
     def GenerateRequestTelegram(self, RequestIdentifier):
         ### Generate Dataframe
@@ -174,22 +174,29 @@ class StecaConnector:
 
         return Telegram
 
-    def PollInverter(self, requestMessage):
-        power_output = PowerOutput_MIN
-
+    async def PollInverter(self, requestMessage):
         try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.settimeout(3)
-            client.connect((self._host, self._port))
-            client.send(requestMessage)
+            reader, writer = await asyncio.open_connection(self._host, self._port)
 
-            msgResponse = client.recv(1024)
-            # Get the length of the received data
-            length = len(msgResponse)
-            _LOGGER.debug(f"Received {len(msgResponse)} bytes '{str(msgResponse)}'")
+            # Send request
+            writer.write(requestMessage)
+            await writer.drain()  # Ensure the message is sent
+
+            # Receive response
+            msg_response = await reader.read(1024)
+            length = len(msg_response)
+            _LOGGER.debug(f"Received {length} bytes '{str(msg_response)}'")
+
+            # Close the connection
+            writer.close()
+            await writer.wait_closed()
+
+            # return msg_response
 
         except Exception as e:
-            # _LOGGER.warning("No response from Steca inverter. " +  str(e))
+            _LOGGER.debug(
+                f"No response from Steca inverter. ({self._errorcount}) " + str(e)
+            )
             if self._errorcount > 5:
                 _LOGGER.warning(
                     f"No response from Steca inverter. ({self._errorcount}) " + str(e)
@@ -197,27 +204,27 @@ class StecaConnector:
                 self._previous_value = None
 
             self._errorcount += 1
-            return self._previous_value
+            # return self._previous_value
 
         self._errorcount = 0
 
         try:
-            if len(msgResponse) < 11:
+            if len(msg_response) < 11:
                 _LOGGER.info(
                     "Steca response too short, probably incomplete message received from inverter"
                 )
                 return PowerOutput_MIN
 
-            ResponseCode = msgResponse[8]
-            ResponseValue = msgResponse[11]
+            ResponseCode = msg_response[8]
+            ResponseValue = msg_response[11]
 
             if ResponseCode == 0x01:  # ServiceNotSupported
                 _LOGGER.warning("Service Not Supported by inverter")
                 return "Service Not Supported by inverter"
             elif ResponseValue == 0x29:  # Nominal AC power of inverter
                 _LOGGER.debug("Nominal AC power of inverter")
-                if msgResponse[22] == 0x0B:
-                    power_output = self.formulaToFloat(msgResponse[23:26])
+                if msg_response[22] == 0x0B:
+                    power_output = self.formulaToFloat(msg_response[23:26])
 
                     if (
                         power_output <= PowerOutput_MIN
@@ -233,20 +240,20 @@ class StecaConnector:
                     power_output = PowerOutput_MIN
 
                 self._previous_value = power_output
-                return power_output
+                return round(power_output, 0)
 
             elif ResponseValue == 0x04:  # Data and time
                 _LOGGER.debug("Data and time")
-                year = self.formulaToSInt(msgResponse[13:15])
-                month = self.formulaToSInt(msgResponse[17:19])
-                day = self.formulaToSInt(msgResponse[21:23])
-                hour = self.formulaToSInt(msgResponse[25:27])
-                minute = self.formulaToSInt(msgResponse[29:31])
-                second = self.formulaToSInt(msgResponse[33:35])
+                year = self.formulaToSInt(msg_response[13:15])
+                month = self.formulaToSInt(msg_response[17:19])
+                day = self.formulaToSInt(msg_response[21:23])
+                hour = self.formulaToSInt(msg_response[25:27])
+                minute = self.formulaToSInt(msg_response[29:31])
+                second = self.formulaToSInt(msg_response[33:35])
                 _LOGGER.debug(
                     f"Date in inverter {year}-{month}-{day} {hour}:{minute}:{second}"
                 )
-                return f"{year}-{month}-{day} {hour}:{minute}:{second}, status: '{msgResponse[39:len(msgResponse)-4].decode('utf-8')}'"
+                return f"{year}-{month}-{day} {hour}:{minute}:{second}, status: '{msg_response[39 : len(msg_response) - 4].decode('utf-8')}'"
 
         except Exception:  # pylint: disable=broad-except
             _LOGGER.debug(
