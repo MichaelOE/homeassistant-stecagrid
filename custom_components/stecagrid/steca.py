@@ -67,6 +67,9 @@ class StecaConnector:
         self._port = port
         self._previous_value = PowerOutput_MIN
         self._errorcount = 0
+        self.current_power_output = 0
+        self.current_timestamp: str = "yyyy-MM-dd HH:mm:ss"
+        self.timestamp_status: str = False
 
     # A function that takes a current CRC value, a data buffer, and a data length as parameters
     def RS485_CRC8_Block(self, currentCrc, data):
@@ -145,13 +148,6 @@ class StecaConnector:
         DataFrameLength = bytearray(struct.pack(">h", len(DataFrame)))
         DataFrame.append(DataFrameCRC)  # and append
 
-        ### Concat to FrameData
-        FrameData = bytearray(b"")
-        FrameData.extend(ServiceCode)
-        FrameData.extend(AuthLevel)
-        FrameData.extend(DataFrameLength)
-        FrameData.extend(DataFrame)
-
         ### Generate Header
         HeaderBegin = bytearray(b"\x02\x01")
         HeaderLength = bytearray(b"\x00\x10")
@@ -161,6 +157,13 @@ class StecaConnector:
         Header.extend(ReceiverAddress)
         Header.extend(SenderAddress)
         Header.append(self.RS485_CRC8_Block(CRC_8_OFFSET, Header))
+
+        ### Concat to FrameData
+        FrameData = bytearray(b"")
+        FrameData.extend(ServiceCode)
+        FrameData.extend(AuthLevel)
+        FrameData.extend(DataFrameLength)
+        FrameData.extend(DataFrame)
 
         Telegram = bytearray(b"")
         Telegram.extend(Header)
@@ -240,7 +243,8 @@ class StecaConnector:
                     power_output = PowerOutput_MIN
 
                 self._previous_value = power_output
-                return round(power_output, 0)
+                self.current_power_output = power_output
+                return round(self.current_power_output, 0)
 
             elif ResponseValue == 0x04:  # Data and time
                 _LOGGER.debug("Data and time")
@@ -251,9 +255,16 @@ class StecaConnector:
                 minute = self.formulaToSInt(msg_response[29:31])
                 second = self.formulaToSInt(msg_response[33:35])
                 _LOGGER.debug(
-                    f"Date in inverter {year}-{month}-{day} {hour}:{minute}:{second}"
+                    f"Date in inverter {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
                 )
-                return f"{year}-{month}-{day} {hour}:{minute}:{second}, status: '{msg_response[39 : len(msg_response) - 4].decode('utf-8')}'"
+                self.current_timestamp = (
+                    f"{year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}"
+                )
+                self.timestamp_status = msg_response[39 : len(msg_response) - 4].decode(
+                    "utf-8"
+                )
+                # return f"{self.timestamp_status}, status: '{msg_response[39 : len(msg_response) - 4].decode('utf-8')}'"
+                return self.current_timestamp
 
         except Exception:  # pylint: disable=broad-except
             _LOGGER.debug(

@@ -152,12 +152,21 @@ class StecagridSensor(CoordinatorEntity, SensorEntity):
                 f"Unexpected error: {str(ex)} while handling {self.entity_description.key}"
             )
 
+    @property
+    def extra_state_attributes(self):
+        if "time" in self.entity_description.key:
+            attributes = {}
+            attributes["Status"] = self.coordinator.stecaApi.timestamp_status
+            return attributes
+        else:
+            None
+
 
 SENSORS_INVERTER: tuple[SensorEntityDescription, ...] = (
     StecaGridEntityDescription(
         key="output",
         name="Output power",
-        icon="mdi:power",
+        icon="mdi:solar-power",
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
         value=lambda data, key: data[key],
