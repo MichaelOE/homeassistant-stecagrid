@@ -1,6 +1,8 @@
 # Stecagrid
 Home Assistant custom integration for reading information from Steca StecaGrid inverters with proprietary RS485 protocol (Steca StecaGrid 8000+ 3ph)
 
+[![BuyMeCoffee][buymecoffeebadge]][michaeloe-buymecoffee]
+
 This is still a work in progress, and being a complete rookie in this HA/python game makes this kinda try'n'catch project...
 
 ## Target
@@ -21,3 +23,5 @@ The physical connection I got information from here: https://svgroeneveld.blogsp
 
 I got inspiration from this Arduino project: https://github.com/tsybolek/Aquarea_Stecagrid_Modbus_NodeMCU/blob/master/aquarea_steca_modbus_public.ino
 
+[buymecoffeebadge]: https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png
+[michaeloe-buymecoffee]: https://buymeacoffee.com/michaeloe
