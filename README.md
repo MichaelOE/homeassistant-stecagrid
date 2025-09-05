@@ -7,7 +7,7 @@ Home Assistant custom integration for reading information from Steca StecaGrid i
 The project is meant to get current power production from a StecaGrid 8000+ 3ph solar inverter
 
 ## Method
-I used a cheap LAN-to-RS485 converter so connect to the inverter https://raspberrypi.dk/produkt/rs485-til-ethernet-converter-til-eu/
+I used a cheap LAN-to-RS485 converter to connect to the inverter - https://raspberrypi.dk/produkt/rs485-til-ethernet-converter-til-eu/
 
 ## Sensors
 Currently I have the interver return only 2 values - current output power and the inverter timestamp.
