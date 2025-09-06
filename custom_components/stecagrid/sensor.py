@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfPower
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower, UnitOfElectricPotential
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -123,9 +123,33 @@ class StecagridSensor(CoordinatorEntity, SensorEntity):
         data_available = False
 
         try:
-            # Handle power
+            # Handle AC power
             if "output" in self.entity_description.key:
-                self._attr_native_value = self.coordinator.data["power"]
+                self._attr_native_value = self.coordinator.data["ac_power"]
+                data_available = True
+            # Handle AC power
+            if "ac_power" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.data["ac_power"]
+                data_available = True
+
+            # Handle panel power
+            if "panel_power" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.data["panel_power"]
+                data_available = True
+
+            # Handle panel voltage
+            if "panel_voltage" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.data["panel_voltage"]
+                data_available = True
+
+            # Handle panel current
+            if "panel_current" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.data["panel_current"]
+                data_available = True
+
+            # Handle daily yield
+            if "daily_yield" in self.entity_description.key:
+                self._attr_native_value = self.coordinator.data["daily_yield"]
                 data_available = True
 
             # Handle time
@@ -169,6 +193,46 @@ SENSORS_INVERTER: tuple[SensorEntityDescription, ...] = (
         icon="mdi:solar-power",
         device_class=SensorDeviceClass.POWER,
         native_unit_of_measurement=UnitOfPower.WATT,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="ac_power",
+        name="Output AC power",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="panel_power",
+        name="Output Panel power",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.POWER,
+        native_unit_of_measurement=UnitOfPower.WATT,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="panel_voltage",
+        name="Panel voltage",
+        icon="mdi:flash",
+        device_class=SensorDeviceClass.VOLTAGE,
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="panel_current",
+        name="Panel current",
+        icon="mdi:current-ac",
+        device_class=SensorDeviceClass.CURRENT,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        value=lambda data, key: data[key],
+    ),
+    StecaGridEntityDescription(
+        key="daily_yield",
+        name="Output today",
+        icon="mdi:solar-power",
+        device_class=SensorDeviceClass.ENERGY,
+        native_unit_of_measurement=UnitOfEnergy.WATT_HOUR,
         value=lambda data, key: data[key],
     ),
     StecaGridEntityDescription(
