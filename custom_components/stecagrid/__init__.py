@@ -107,9 +107,13 @@ class StecaGridCoordinator(DataUpdateCoordinator):
         try:
             retData = {}
             async with asyncio.timeout(3):
-                retData["power"] = await self.stecaApi.GetPowerOutput()
+                retData["ac_power"] = await self.stecaApi.GetACOutput()
+                retData["panel_power"] = await self.stecaApi.GetPanelOutput()
+                retData["panel_voltage"] = await self.stecaApi.GetPanelVoltage()
+                retData["panel_current"] = await self.stecaApi.GetPanelCurrent()
+                retData["daily_yield"] = await self.stecaApi.GetDailyYield()
                 retData["time"] = await self.stecaApi.GetInverterTime()
-
+                
                 return retData
         except:
             _LOGGER.error("StecaGridCoordinator _async_update_data failed")
