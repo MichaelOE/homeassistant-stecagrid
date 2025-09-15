@@ -14,7 +14,7 @@ Currently I have the inverter return only 2 values - 'current power output' and 
 According to the Steca docs, it should return other values as well, but maybe my inverter firmware is too old as it just returns 'not supported' for other queries.
 If you know how to get more info, please let me know. :smiley:
 
-![billede](https://github.com/user-attachments/assets/c2e4b919-ea91-4371-859f-10ad60c8dd92)
+![billede](https://github.com/user-attachments/assets/3ae54f9b-27df-4349-b650-ae6786a030f6)
 
 
 ## Credits
