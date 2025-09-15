@@ -10,12 +10,14 @@ The project is meant to get current power production from a StecaGrid 8000+ 3ph 
 I used a cheap LAN-to-RS485 converter to connect to the inverter - https://raspberrypi.dk/produkt/rs485-til-ethernet-converter-til-eu/
 
 ## Sensors
-Currently I have the inverter return only 2 values - 'current power output' and the 'inverter timestamp'.
-According to the Steca docs, it should return other values as well, but maybe my inverter firmware is too old as it just returns 'not supported' for other queries.
-If you know how to get more info, please let me know. :smiley:
-
+Several sensors from the inverter is exposed, including:
+- Current ouptut power to grid
+- Current panel power
+- Current panel voltage
+- Current panel current
+- Todays total output
+ 
 ![billede](https://github.com/user-attachments/assets/3ae54f9b-27df-4349-b650-ae6786a030f6)
-
 
 ## Credits
 The physical connection I got information from here: https://svgroeneveld.blogspot.com/2015/08/communication-with-inverter.html
