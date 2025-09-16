@@ -16,8 +16,8 @@ Several sensors from the inverter is exposed, including:
 - Current panel voltage
 - Current panel current
 - Todays total output
- 
-![billede](https://github.com/user-attachments/assets/3ae54f9b-27df-4349-b650-ae6786a030f6)
+
+![billede](https://github.com/user-attachments/assets/9cd77002-f1f3-4711-b854-1526972bef73)
 
 ## Credits
 The physical connection I got information from here: https://svgroeneveld.blogspot.com/2015/08/communication-with-inverter.html
